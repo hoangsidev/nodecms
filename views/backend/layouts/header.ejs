@@ -15,9 +15,9 @@
         <script src="<%= get_admin_url(); %>/js/bootstrap.min.js"></script>
         <script src="<%= get_admin_url(); %>/js/vue.min.js"></script>
         <title>
-            <% if(typeof page_title !== 'undefined' && page_title!='') { %>
-                <%= page_title  %>
-                    <% } %>
+            <% if(typeof site_info !== 'undefined') { %>
+                <%= site_info.page_title  %>
+            <% } %>
         </title>
     </head>
 

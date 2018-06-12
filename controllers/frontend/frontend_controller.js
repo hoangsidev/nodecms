@@ -1,8 +1,13 @@
-var m_articles = require('../../models/backend/articles_model.js');
-
-var home_controller = {
-    index: (req, res) => {
-        res.render('frontend/index');
+var m_posts = require('../backend/posts_controller.js');
+var m_users = require('../../models/users_model.js');
+var frontend_controller = {
+    index: (req, res, next) => {
+        res.render('frontend/index', {
+            site_info: {
+                page_title: 'Home',
+                page_slug: 'index'
+            }
+        });
     }
 }
-module.exports = home_controller;
+module.exports = frontend_controller;

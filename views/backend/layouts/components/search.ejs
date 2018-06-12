@@ -1,4 +1,4 @@
-<form action="<%= get_admin_url(); %>/articles/" method="GET" class="wrap_search">
+<form action="<%= get_admin_url(); %>/posts/" method="GET" class="wrap_search">
     <input type="text" id="search" name="search" value="<% if(typeof key_search !== 'undefined' && key_search!='') { %><%= key_search %><% } %>"
         autocomplete="off" placeholder="Search...">
     <button type="submit" id="submit_s" class="hover_opacity">

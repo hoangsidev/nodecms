@@ -1,16 +1,15 @@
 /* https://hoangsi.com/ */
-var config = require('./config/config.js');
-var app = config.app();
-var express = config.express();
-var session = config.session();
-var body_parser = config.body_parser();
-var path = config.path();
-var fs = config.fs();
-
-const server = require('http').Server(app);
-const method_override = require('method-override')
+var configs = require('./config/configs.js'),
+    app = configs.app(),
+    express = configs.express(),
+    session = configs.session(),
+    body_parser = configs.body_parser(),
+    path = configs.path(),
+    fs = configs.fs(),
+    server = require('http').Server(app),
+    method_override = require('method-override');
 global.io = require('socket.io')(server);  // golobal để sử dụng trên tất cả file
-// phải dùng cái này mới dùng được Post
+
 server.listen(process.env.PORT || 3000, () => { console.log('Server runing with port 3000 !!!!'); });
 /* --------------------------------------------------------------------------------------- */
 app.use(body_parser.json()); // support json encoded bodies
@@ -26,22 +25,12 @@ app.use((req, res, next) => {
 });
 
 /* --------------------------------------------------------------------------------------- */
-var backend_controller = require('./controllers/backend/backend_controller.js');
-var articles_controller = require('./controllers/backend/articles_controller.js');
-var users_controller = require('./controllers/backend/users_controller.js');
+var backend_controller = require('./controllers/backend/backend_controller.js'),
+    posts_controller = require('./controllers/backend/posts_controller.js'),
+    users_controller = require('./controllers/backend/users_controller.js');
+/* ----- */
 var frontend_controller = require('./controllers/frontend/frontend_controller.js');
 /* --------------------------------------------------------------------------------------- */
-
-
-// RESTful API
-app.route('/api/articles')
-    .get(articles_controller.api_articles)
-    .post(articles_controller.api_insert)
-app.route('/api/articles/:id')
-    .get(articles_controller.api_edit)
-    .put(articles_controller.api_update)
-    .delete(articles_controller.api_delete)
-// End RESTful API
 
 // BACKEND
 
@@ -53,29 +42,29 @@ function auth(req, res, next) {
     }
 }
 
-// articles
 app.route('/backend/dashboard')
     .get(auth, backend_controller.dashboard)
 
-app.route('/backend/articles')
-    .get(auth, articles_controller.articles)
+// posts
+app.route('/backend/posts')
+    .get(auth, posts_controller.posts)
 
-app.route('/backend/articles/page/:page')
-    .get(auth, articles_controller.articles)
+app.route('/backend/posts/page/:page')
+    .get(auth, posts_controller.posts)
 
-app.route('/backend/articles/create')
-    .get(auth, articles_controller.create)
-    .post(auth, articles_controller.insert)
+app.route('/backend/posts/create')
+    .get(auth, posts_controller.create)
+    .post(auth, posts_controller.create)
 
-app.route('/backend/articles/edit/:id')
-    .get(auth, articles_controller.edit)
+app.route('/backend/posts/update/:_id')
+    .get(auth, posts_controller.update)
 
-app.route('/backend/articles/update')
-    .put(auth, articles_controller.update)
+app.route('/backend/posts/update')
+    .put(auth, posts_controller.update)
 
-app.route('/backend/articles/delete')
-    .delete(auth, articles_controller.delete)
-// end articles
+app.route('/backend/posts/delete')
+    .delete(auth, posts_controller.delete)
+// end posts
 
 // users
 app.route('/signin')
@@ -103,7 +92,7 @@ app.route('/backend/users/create')
     .get(auth, users_controller.create)
     .post(auth, users_controller.create)
 
-app.route('/backend/users/edit/:id')
+app.route('/backend/users/update/:_id')
     .get(auth, users_controller.update)
 
 app.route('/backend/users/update')

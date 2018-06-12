@@ -4,24 +4,24 @@
     </div>
     <ul class="list-group">
         <li>
-            <a href="<%= get_admin_url(); %>/dashboard" class="list-group-item main  <% if(typeof page_slug !== 'undefined' && page_slug=='dashboard') { %> active <% } %>">
+            <a href="<%= get_admin_url(); %>/dashboard" class="list-group-item main  <% if(typeof site_info !== 'undefined' && site_info.page_slug=='dashboard') { %> active <% } %>">
                 <i class="fa fa-tachometer" aria-hidden="true"></i>&nbsp; Dashboard
             </a>
         </li>
     </ul>
     <ul class="list-group">
         <li>
-            <a href="<%= get_admin_url(); %>/articles" class="list-group-item main <% if(typeof page_slug !== 'undefined' && (page_slug=='articles' || page_slug=='edit') ) { %> active <% } %>">
+            <a href="<%= get_admin_url(); %>/posts" class="list-group-item main <% if(typeof site_info !== 'undefined' && (site_info.page_slug=='posts' || site_info.page_slug=='edit') ) { %> active <% } %>">
                 <i class="fa fa-newspaper-o" aria-hidden="true"></i>&nbsp; Articles
             </a>
         </li>
         <li>
-            <a href="<%= get_admin_url(); %>/articles" class="list-group-item <% if(typeof page_slug !== 'undefined' && page_slug=='articles') { %> active <% } %>">
-                All articles
+            <a href="<%= get_admin_url(); %>/posts" class="list-group-item <% if(typeof site_info !== 'undefined' && site_info.page_slug=='posts') { %> active <% } %>">
+                All posts
             </a>
         </li>
         <li>
-            <a href="<%= get_admin_url(); %>/articles/create" class="list-group-item <% if(typeof page_slug !== 'undefined' && page_slug=='create') { %> active <% } %>">
+            <a href="<%= get_admin_url(); %>/posts/create" class="list-group-item <% if(typeof site_info !== 'undefined' && site_info.page_slug=='create') { %> active <% } %>">
                 Add new
             </a>
         </li>
@@ -43,7 +43,7 @@
             </a>
         </li>
         <li>
-            <a href="#" class="list-group-item <% if(typeof page_slug !== 'undefined' && page_slug=='pages') { %> active <% } %>">
+            <a href="#" class="list-group-item <% if(typeof site_info !== 'undefined' && site_info.page_slug=='pages') { %> active <% } %>">
                 All pages
             </a>
         </li>
@@ -55,17 +55,17 @@
     </ul>
     <ul class="list-group">
         <li>
-            <a href="<%= get_admin_url(); %>/users" class="list-group-item main <% if(typeof page_slug !== 'undefined'  && (page_slug=='users' || page_slug=='edit_user')) { %> active <% } %>">
+            <a href="<%= get_admin_url(); %>/users" class="list-group-item main <% if(typeof site_info !== 'undefined'  && (site_info.page_slug=='users' || site_info.page_slug=='edit_user')) { %> active <% } %>">
                 <i class="fa fa-users" aria-hidden="true"></i>&nbsp; Users
             </a>
         </li>
         <li>
-            <a href="<%= get_admin_url(); %>/users" class="list-group-item <% if(typeof page_slug !== 'undefined' && page_slug=='users') { %> active <% } %>">
+            <a href="<%= get_admin_url(); %>/users" class="list-group-item <% if(typeof site_info !== 'undefined' && site_info.page_slug=='users') { %> active <% } %>">
                 All users
             </a>
         </li>
         <li>
-            <a href="<%= get_admin_url(); %>/users/create" class="list-group-item <% if(typeof page_slug !== 'undefined' && page_slug=='create_user') { %> active <% } %>">
+            <a href="<%= get_admin_url(); %>/users/create" class="list-group-item <% if(typeof site_info !== 'undefined' && site_info.page_slug=='create_user') { %> active <% } %>">
                 Add new
             </a>
         </li>

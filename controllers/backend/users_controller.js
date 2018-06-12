@@ -1,40 +1,79 @@
-var m_users = require('../../models/backend/users_model.js');
-var config = require('../../config/config.js');
-var md5 = config.md5();
-var fs = config.fs();
-var path = config.path();
-var formidable = config.formidable();
-var app = config.app();
-var body_parser = config.body_parser();
-var get_base_url = config.get_base_url();
-var get_admin_url = config.get_admin_url();
+var configs = require('../../config/configs.js'),
+    m_users = require('../../models/users_model.js'),
+    md5 = configs.md5(),
+    fs = configs.fs(),
+    path = configs.path(),
+    formidable = configs.formidable(),
+    app = configs.app(),
+    body_parser = configs.body_parser(),
+    get_site_url = configs.get_site_url(),
+    get_admin_url = configs.get_admin_url(),
+    get_site_name = configs.get_site_name(),
+    nodemailer = configs.nodemailer(),
+    mail_auth = nodemailer.createTransport({ service: 'gmail', auth: { user: 'authentication.smtp.mail@gmail.com', pass: 'u+J%E^9!hx?p' } });
 
-app.use(body_parser.json()); // support json encoded bodies
-app.use(body_parser.urlencoded({ extended: true })); // support encoded bodies
+app.use(body_parser.json());
+app.use(body_parser.urlencoded({ extended: true }));
 
-// config mail
-var nodemailer = require('nodemailer');
-var mail_auth = nodemailer.createTransport({ service: 'gmail', auth: { user: 'authentication.smtp.mail@gmail.com', pass: 'u+J%E^9!hx?p' } });
-// end config mail
+
 function valid_username(username) {
-    var re = /^[a-zA-Z0-9]+$/;
-    return re.test(username);
+    if (username) {
+        var re = /^[a-zA-Z0-9]+$/;
+        return re.test(username);
+    }
 }
 function valid_email(email) {
-    var re = /^(([^<>()\[\]\\.,;:\s@"]+(\.[^<>()\[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
-    return re.test(email);
+    if (email) {
+        var re = /^(([^<>()\[\]\\.,;:\s@"]+(\.[^<>()\[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
+        return re.test(email);
+    }
 }
 function valid_password(password) {
-    var re = /(?=.*\d)(?=.*[a-z])(?=.*[A-Z]).{6,}/;
-    return re.test(password);
+    if (password) {
+        var re = /(?=.*\d)(?=.*[a-z])(?=.*[A-Z]).{6,}/;
+        return re.test(password);
+    }
+}
+
+function check_exist_user() { // check exist username & email with socket.io
+    io.on('connection', (socket) => {
+        socket.on('guest_username', (username) => {
+            var username = (username && username != null && username != '' && typeof username !== 'undefined' && valid_username(username)) ? username : undefined;
+            if (username) {
+                m_users.findOne({ username: username }).exec((err, result) => {
+                    if (result) { socket.emit('ser_exist_username'); }
+                })
+            }
+        });
+        socket.on('guest_email', (email) => {
+            var email = (email && email != null && email != '' && typeof email !== 'undefined' && valid_email(email)) ? email : undefined;
+            if (email) {
+                m_users.findOne({ email: email }).exec((err, result) => {
+                    if (result) { socket.emit('ser_exist_email'); }
+                })
+            }
+        });
+        socket.setMaxListeners(0);
+    });
 }
 
 var users_controller = {
-    signin: (req, res, next) => {
-        if (req.method == 'POST') {
-            var username = req.body.username ? req.body.username : null;
-            var password = req.body.password ? req.body.password : null;
-            if ((username != null && password != null)) {
+    signin: (req, res, next) => { // done
+        if (req.method == 'GET') {
+            if (req.session.me) {
+                res.redirect(get_admin_url + '/dashboard');
+            } else {
+                res.render('backend/users/signin.ejs', {
+                    site_info: {
+                        page_title: 'Sign in',
+                        page_slug: 'signin'
+                    }
+                });
+            }
+        } else if (req.method == 'POST') {
+            var username = (req.body.username && req.body.username != null && req.body.username != '' && typeof req.body.username !== 'undefined') ? req.body.username : undefined,
+                password = (req.body.password && req.body.password != null && req.body.password != '' && typeof req.body.password !== 'undefined') ? req.body.password : undefined;
+            if (username && password) {
                 m_users.findOne({
                     $or: [{ username: username }, { email: username }], password: md5(password)
                 }).exec((err, result) => {
@@ -43,6 +82,10 @@ var users_controller = {
                         res.redirect(get_admin_url + '/dashboard');
                     } else {
                         res.render('backend/users/signin.ejs', {
+                            site_info: {
+                                page_title: 'Sign in',
+                                page_slug: 'signin'
+                            },
                             incorrect: true
                         });
                     }
@@ -50,37 +93,30 @@ var users_controller = {
             } else { // if nó phá bậy bạ
                 res.redirect('/signin');
             }
-        } else if (req.method == 'GET') { // if GET
+        }
+    },
+    signup: (req, res, next) => { // done
+        check_exist_user();
+        if (req.method == 'GET') {// if GET
             if (req.session.me) {
                 res.redirect(get_admin_url + '/dashboard');
             } else {
-                res.render('backend/users/signin.ejs');
+                res.render('backend/users/signup.ejs', {
+                    site_info: {
+                        page_title: 'Sign up',
+                        page_slug: 'signup'
+                    }
+                });
             }
-        }
-    },
-    signup: (req, res) => {
-        io.on('connection', (socket) => { // check exist with socket.io
-            socket.on('guest_username', (username) => {
-                m_users.findOne({ username: username }).exec((err, result) => {
-                    if (result) { socket.emit('ser_exist_username'); }
-                })
-            });
-            socket.on('guest_email', (email) => {
-                m_users.findOne({ email: email }).exec((err, result) => {
-                    if (result) { socket.emit('ser_exist_email'); }
-                })
-            });
-            socket.setMaxListeners(0);
-        });
-        if (req.method == 'POST') {
-            var username = req.body.username ? req.body.username : null;
-            var email = req.body.email ? req.body.email : null;
-            var password = req.body.password ? req.body.password : null;
-            if ((username != null && email != null && password != null) && (valid_username(username) && valid_email(email) && valid_password(password))) {
+        } else if (req.method == 'POST') {
+            var username = (req.body.username && req.body.username != null && req.body.username != '' && typeof req.body.username !== 'undefined' && valid_username(req.body.username)) ? req.body.username : undefined,
+                email = (req.body.email && req.body.email != null && req.body.email != '' && typeof req.body.email !== 'undefined' && valid_email(req.body.email)) ? req.body.email : undefined,
+                password = (req.body.password && req.body.password != null && req.body.password != '' && typeof req.body.password !== 'undefined' && valid_password(req.body.password)) ? req.body.password : undefined;
+            if (username && email && password) {
                 var arr_data = new Object();
                 arr_data.username = username;
                 arr_data.email = email;
-                arr_data.display_name = username;
+                arr_data.display_name = display_name;
                 arr_data.password = md5(password);
                 arr_data.thumbnail = null;
                 arr_data.key = md5(Math.random().toString());
@@ -92,37 +128,29 @@ var users_controller = {
                         req.session.me = result;
                         res.redirect(get_admin_url + '/dashboard');
                         // verify email
-                        var url_verify = get_base_url + '/verify/' + result.username + '/' + result.key;
-                        var mail_options = {
-                            from: 'it.hoangsi@gmail.com', to: email, subject: '[' + config.blog_name() + '] Please verify your email address.',
-                            html: `
+                        var url_verify = get_site_url + '/verify/' + result.username + '/' + result.key,
+                            mail_options = {
+                                from: 'it.hoangsi@gmail.com', to: email, subject: '[' + get_site_name + '] Please verify your email address.',
+                                html: `
                                 Help us secure your account by verifying your email address (` + result.email + `). This lets you access all of our features.<br><br>
                                 <a href="` + url_verify + `">` + url_verify + `</a><br><br>
-                                You’re receiving this email because you recently created a new `+ config.blog_name() + ` account or added a new email address. If this wasn’t you, please ignore this email.`
-                        };
+                                You’re receiving this email because you recently created a new `+ get_site_name + ` account or added a new email address. If this wasn’t you, please ignore this email.`
+                            };
                         mail_auth.sendMail(mail_options, (err, sent) => {
-                            if (!err) {
-                                console.log('Sent verify!');
-                            }
+                            if (!err) { console.log('Sent verify!'); }
                         });
                         // end verify email
                     }
                 });
             } else { // if nó phá bậy bạ
-                res.redirect(get_base_url + '/signup');
-            }
-        } else if (req.method == 'GET') {// if GET
-            if (req.session.me) {
-                res.redirect(get_admin_url + '/dashboard');
-            } else {
-                res.render('backend/users/signup.ejs');
+                res.redirect(get_site_url + '/signup');
             }
         }
     },
-    verify: (req, res) => {
-        var username = req.params.username ? req.params.username : null;
-        var key = req.params.key ? req.params.key : null;
-        if (username != null && key != null) {
+    verify: (req, res, next) => { // done
+        var username = (req.params.username && req.params.username != null && req.params.username != '' && typeof req.params.username !== 'undefined' && valid_username(req.params.username)) ? req.params.username : undefined,
+            key = (req.params.key && req.params.key != null && req.params.key != '' && typeof req.params.key !== 'undefined') ? req.params.key : undefined;
+        if (username && key) {
             m_users.findOneAndUpdate({ username: username, key: key }, { $set: { verify: 1 } }, { new: true }, (err, result) => {
                 if (result) {
                     if (req.session.me) {
@@ -132,44 +160,92 @@ var users_controller = {
                             verified: true,
                             username: result.username ? result.username : null,
                             email: result.email ? result.email : null,
+                            site_info: {
+                                page_title: 'Verify Email',
+                                page_slug: 'verify'
+                            }
                         });
                     }
                 } else { // nếu url sai
-                    res.redirect(get_base_url + '/signin');
+                    res.redirect(get_site_url + '/signin');
                 }
             })
         }
     },
-    signout: (req, res) => {
+    signout: (req, res, next) => { // done
         req.session = null;
-        res.redirect(get_base_url + '/signin/')
+        if (req.session == null) {
+            res.redirect(get_site_url + '/signin');
+        }
     },
-    password_reset: (req, res) => {
-        if (req.method == 'POST') {
-            var email = req.body.email ? req.body.email : null;
-            if (email != null && valid_email(email)) {
-                m_users.findOne({ email: email }).exec(function (err, result) {
-                    if (!result) {
+    password_reset: (req, res, next) => { // done
+        if (req.method == 'GET') { // if GET
+            var key = (req.query.key && req.query.key != null && req.query.key != '' && typeof req.query.key !== 'undefined') ? req.query.key : undefined;
+            if (key) {
+                m_users.findOne({ key: key }).exec((err, result) => { // nếu key đúng mới hiện form đổi mật khẩu
+                    if (result) {
+                        res.render('backend/users/change_password_reset.ejs', {
+                            key: key ? key : null,
+                            site_info: {
+                                page_title: 'Password Reset',
+                                page_slug: 'password_reset'
+                            }
+                        });
+                    } else { // key ko hợp lệ
                         res.render('backend/users/password_reset.ejs', {
-                            not_match_email: true
+                            not_match_key: true,
+                            site_info: {
+                                page_title: 'Password Reset',
+                                page_slug: 'password_reset'
+                            }
+                        });
+                    }
+                });
+            } else { // if ko có key thì trả ra giao diện
+                res.render('backend/users/password_reset.ejs', {
+                    site_info: {
+                        page_title: 'Password Reset',
+                        page_slug: 'password_reset'
+                    }
+                });
+            }
+        } else if (req.method == 'POST') {
+            var email = (req.body.email && req.body.email != null && req.body.email != '' && typeof req.body.email !== 'undefined' && valid_email(req.body.email)) ? req.body.email : undefined;
+            if (email) {
+                m_users.findOne({ email: email }).exec((err, result) => {
+                    if (!result) { // email not exist
+                        res.render('backend/users/password_reset.ejs', {
+                            not_match_email: true, 
+                            site_info: {
+                                page_title: 'Password Reset',
+                                page_slug: 'password_reset'
+                            }
                         });
                     } else {
-                        if (result.verify == '0') { // kiểm tra xem email đã được xác minh hay chưa
+                        if (result.verify == '0') { // if email not verified, can not reset pass
                             res.render('backend/users/password_reset.ejs', {
-                                unverify: true
+                                unverify: true,
+                                site_info: {
+                                    page_title: 'Password Reset',
+                                    page_slug: 'password_reset'
+                                }
                             });
-                        } else {
+                        } else { // if exist email, set a key, then send a email to user
                             m_users.findOneAndUpdate({ email: email }, { $set: { key: md5(Math.random().toString()) } }, { new: true }, (err, result) => {
-                                var url_password_reset = get_base_url + '/password_reset?key=' + result.key;
-                                var mail_options = {
-                                    from: 'it.hoangsi@gmail.com', to: email, subject: '[' + config.blog_name() + '] Please reset your password',
-                                    html: `We heard that you lost your password. Sorry about that! <br> But don’t worry! You can use the following link to reset your password:<br><br>
+                                var url_password_reset = get_site_url + '/password_reset?key=' + result.key,
+                                    mail_options = {
+                                        from: 'it.hoangsi@gmail.com', to: email, subject: '[' + get_site_name + '] Please reset your password',
+                                        html: `We heard that you lost your password. Sorry about that! <br> But don’t worry! You can use the following link to reset your password:<br><br>
                                 <a href="` + url_password_reset + `">` + url_password_reset + `</a><br><br>Thanks!`
-                                };
-                                mail_auth.sendMail(mail_options, function (err, sent) {
+                                    };
+                                mail_auth.sendMail(mail_options, (err, sent) => {
                                     if (!err) {
                                         res.render('backend/users/password_reset.ejs', {
-                                            sent_email: true
+                                            sent_email: true,
+                                            site_info: {
+                                                page_title: 'Password Reset',
+                                                page_slug: 'password_reset'
+                                            }
                                         });
                                     }
                                 });
@@ -180,163 +256,122 @@ var users_controller = {
             } else { // if nó phá bậy bạ
                 res.redirect(get_admin_url + '/password_reset');
             }
-        } else if (req.method == 'GET') { // if GET
-            var key = req.query.key ? req.query.key : null;
-            if (typeof key !== 'undefined' && key) {
-                m_users.findOne({ key: key }).exec(function (err, result) { // nếu key đúng mới hiện form đổi mật khẩu
-                    if (result) {
-                        res.render('backend/users/change_password_reset.ejs', {
-                            key: key ? key : null
-                        });
-                    } else { // key ko hợp lệ
-                        res.render('backend/users/password_reset.ejs', {
-                            not_match_key: true
-                        });
-                    }
-                });
-            } else { // if ko có key thì trả ra giao diện
-                res.render('backend/users/password_reset.ejs');
-            }
         } else if (req.method == 'PUT') { // if PUT
-            var key = req.query.key ? req.query.key : null;
-            var password = req.body.password ? req.body.password : null;
-            if (password != null && valid_password(password)) {
+            var password = (req.body.password && req.body.password != null && req.body.password != '' && typeof req.body.password !== 'undefined' && valid_password(req.body.password)) ? req.body.password : undefined,
+                key = (req.query.key && req.query.key != null && req.query.key != '' && typeof req.query.key !== 'undefined') ? req.query.key : undefined;
+            if (password && key) {
                 m_users.findOneAndUpdate({ key: key }, { $set: { password: md5(password) } }, { new: true }, (err, result) => {
-                    if (result) {
-                        // sau khi đổi thành công thì đổi key để khỏi truy cập vào link cũ
+                    if (result) { // after change password, change key to access denied to old links
                         m_users.findOneAndUpdate({ key: key }, { $set: { key: md5(Math.random().toString()) } }, { new: true }, (err, result) => {
-                            if (result) { res.redirect(get_base_url + '/signin') }
+                            if (result) { res.redirect(get_site_url + '/signin') }
                         });
                     } else { // đây là trường hợp đúng key, vào trang đổi pass, nhưng nó kiểm tra phần từ và đổi key
-                        res.redirect(get_base_url + '/password_reset');
+                        res.redirect(get_site_url + '/password_reset');
                         console.log('Key đã bị sửa, không khớp');
                     }
                 });
             } else { // đây là trường hợp nó phá
-                res.redirect(get_base_url + '/password_reset');
+                res.redirect(get_site_url + '/password_reset');
             }
         }
     },
 
-
-
-
     // CURD
-
-    users: (req, res, next) => { // list all & search
-        var key_search = req.query.search ? req.query.search : null;
-        var per_page = 5;
-        var page = req.params.page || 1;
-        var page_slug = 'users'; // khai báo slug để sử dụng lại pagination nhiều lần
-
-        if (!key_search) {
-            var page_title = 'All users';
-            m_users.find({})
-                .skip((per_page * page) - per_page)
-                .limit(per_page)
-                .exec(function (err, result) {
-                    m_users.count().exec(function (err, count) {
-                        return res.render('backend/users/users', {
-                            data_users: JSON.stringify(result) ? JSON.stringify(result) : null,
-                            current: page,
-                            pages: Math.ceil(count / per_page),
-                            page_slug: page_slug ? page_slug : null,
-                            paginate: count > per_page ? true : false,
-                            page_title: page_title
-                        });
+    users: (req, res, next) => { // done
+        var key_search = (req.query.search && req.query.search != null && req.query.search != '' && typeof req.query.search !== 'undefined') ? req.query.search : undefined,
+            per_page = 20,
+            page = (req.params.page && req.params.page != null && req.params.page != '' && typeof req.params.page !== 'undefined') ? req.params.page : 1;
+        if (!key_search) {  // list all
+            m_users.find({}).skip((per_page * page) - per_page).limit(per_page).exec((err, result) => {
+                m_users.count().exec(function (err, count) {
+                    return res.render('backend/users/users', {
+                        data_users: JSON.stringify(result) ? JSON.stringify(result) : null,
+                        current: page,
+                        pages: Math.ceil(count / per_page),
+                        paginate: (count > per_page) ? true : false,
+                        site_info: {
+                            page_title: 'All users',
+                            page_slug: 'users',
+                            me: req.session.me ? req.session.me : null
+                        }
                     });
                 });
-        } else { // if search
-            var page_title = 'Search result';
-            m_users.find({
-                $or: [
-                    { 'username': new RegExp('^' + key_search + '$', "i") },
-                    { 'email': new RegExp('^' + key_search + '$', "i") },
-                    { 'display_name': new RegExp('^' + key_search + '$', "i") }
-                ]
-            })
-                .skip((per_page * page) - per_page)
-                .limit(per_page)
-                .exec(function (err, result) {
-                    m_users.find({
-                        $or: [
-                            { 'username': new RegExp('^' + key_search + '$', "i") },
-                            { 'email': new RegExp('^' + key_search + '$', "i") },
-                            { 'display_name': new RegExp('^' + key_search + '$', "i") }
-                        ]
-                    }).count().exec(function (err, count) {
-                        return res.render('backend/users/users', {
-                            data_users: JSON.stringify(result) ? JSON.stringify(result) : null,
-                            current: page,
-                            pages: Math.ceil(count / per_page),
-                            page_slug: page_slug ? page_slug : null,
-                            key_search: key_search ? key_search : null,
-                            count_result: count ? count : null,
-                            paginate: count > per_page ? true : false,
-                            page_title: page_title
-                        });
+            });
+        } else { // if search     
+            var regex = [
+                { 'username': new RegExp(key_search + '$', "i") },
+                { 'email': new RegExp(key_search + '$', "i") },
+                { 'display_name': new RegExp(key_search + '$', "i") }
+            ];
+            m_users.find({ $or: regex }).skip((per_page * page) - per_page).limit(per_page).exec((err, result) => {
+                m_users.find({ $or: regex }).count().exec((err, count) => {
+                    return res.render('backend/users/users', {
+                        data_users: JSON.stringify(result) ? JSON.stringify(result) : null,
+                        current: page,
+                        pages: Math.ceil(count / per_page),
+                        key_search: key_search ? key_search : null,
+                        count_result: count ? count : null,
+                        paginate: count > per_page ? true : false,
+                        site_info: {
+                            page_title: 'Search result',
+                            page_slug: 'search',
+                            me: req.session.me ? req.session.me : null
+                        }
                     });
                 });
+            });
         }
     },
     create: (req, res, next) => {
-        io.on('connection', (socket) => { // check exist with socket.io
-            socket.on('guest_username', (username) => {
-                m_users.findOne({ username: username }).exec((err, result) => {
-                    if (result) { socket.emit('ser_exist_username'); }
-                })
-            });
-            socket.on('guest_email', (email) => {
-                m_users.findOne({ email: email }).exec((err, result) => {
-                    if (result) { socket.emit('ser_exist_email'); }
-                })
-            });
-            socket.setMaxListeners(0);
-        });
-
+        check_exist_user();
         if (req.method == 'GET') {
-            var page_slug = 'create_user';
-            var page_title = 'Add new user';
             res.render('backend/users/create', {
-                page_slug: page_slug,
-                page_title: page_title
+                site_info: {
+                    page_title: 'Add new user',
+                    page_slug: 'create_user',
+                    me: req.session.me ? req.session.me : null
+                }
             });
         } else if (req.method == 'POST') {
-            var form = new formidable.IncomingForm(); form.maxFileSize = 200 * 1024 * 1024;
+            var form = new formidable.IncomingForm(); form.maxFileSize = 20 * 1024 * 1024;
             form.parse(req, (err, fields, files) => {
-                username = fields.username ? fields.username : null;
-                email = fields.email ? fields.email : null;
-                password = fields.password ? fields.password : null;
-                if ((username != null && email != null && password != null) && (valid_username(username) && valid_email(email) && valid_password(password))) {
+                var username = (fields.username && fields.username != null && fields.username != '' && typeof fields.username !== 'undefined' && valid_username(fields.username)) ? fields.username : undefined,
+                    email = (fields.email && fields.email != null && fields.email != '' && typeof fields.email !== 'undefined' && valid_email(fields.email)) ? fields.email : undefined,
+                    password = (fields.password && fields.password != null && fields.password != '' && typeof fields.password !== 'undefined' && valid_password(fields.password)) ? md5(fields.password) : undefined;
+                if (username && email && password) {
                     var arr_data = new Object();
                     arr_data.username = username;
                     arr_data.email = email;
                     arr_data.display_name = fields.display_name ? fields.display_name : null;
-                    arr_data.password = md5(password);
-                    if (files.thumbnail) {
+                    arr_data.password = password;
+                    if (files.thumbnail.name) {
                         var name_file = md5(Math.random().toString());
                         var oldpath = files.thumbnail.path;
                         var type_file = (files.thumbnail.name.split('.'))[1];
                         var newpath = path.resolve('assets/backend/uploads/' + name_file + '.' + type_file);
                         fs.rename(oldpath, newpath, (err) => { });
                         arr_data.thumbnail = name_file + '.' + type_file;
-                    }
+                    } else {
+                        arr_data.thumbnail = null;
+                    };
                     arr_data.key = md5(Math.random().toString());
                     arr_data.verify = '0';
                     arr_data.role = fields.role ? fields.role : '0';
                     arr_data.created_at = new Date();
+                    arr_data.updated_at = null;
                     m_users.create(arr_data, (err, result) => {
                         if (result) {
-                            res.redirect(get_admin_url + '/users/edit/' + result._id)
+                            req.session.me = result;
+                            res.redirect(get_admin_url + '/users');
                             // verify email
-                            var url_verify = get_base_url + '/verify/' + result.username + '/' + result.key;
-                            var mail_options = {
-                                from: 'it.hoangsi@gmail.com', to: email, subject: '[' + config.blog_name() + '] Please verify your email address.',
-                                html: `
-                                    Help us secure your account by verifying your email address (` + result.email + `). This lets you access all of our features.<br><br>
-                                    <a href="` + url_verify + `">` + url_verify + `</a><br><br>
-                                    You’re receiving this email because you recently created a new `+ config.blog_name() + ` account or added a new email address. If this wasn’t you, please ignore this email.`
-                            };
+                            var url_verify = get_site_url + '/verify/' + result.username + '/' + result.key,
+                                mail_options = {
+                                    from: 'it.hoangsi@gmail.com', to: email, subject: '[' + get_site_name + '] Please verify your email address.',
+                                    html: `
+                                Help us secure your account by verifying your email address (` + result.email + `). This lets you access all of our features.<br><br>
+                                <a href="` + url_verify + `">` + url_verify + `</a><br><br>
+                                You’re receiving this email because you recently created a new `+ get_site_name + ` account or added a new email address. If this wasn’t you, please ignore this email.`
+                                };
                             mail_auth.sendMail(mail_options, (err, sent) => {
                                 if (!err) { console.log('Sent verify!'); }
                             });
@@ -349,41 +384,32 @@ var users_controller = {
     },
 
     update: (req, res) => {
-        io.on('connection', (socket) => { // check exist with socket.io
-            socket.on('guest_username', (username) => {
-                m_users.findOne({ username: username }).exec((err, result) => {
-                    if (result) { socket.emit('ser_exist_username'); }
-                })
-            });
-            socket.on('guest_email', (email) => {
-                m_users.findOne({ email: email }).exec((err, result) => {
-                    if (result) { socket.emit('ser_exist_email'); }
-                })
-            });
-            socket.setMaxListeners(0);
-        });
+        check_exist_user();
         if (req.method == 'GET') {
-            var page_slug = 'edit_user';
-            var page_title = 'Edit user';
-            var id = req.params.id;
-            m_users.findOne({ _id: id }, (err, result) => {
-                return res.render('backend/users/edit', {
-                    data_user: JSON.stringify(result) ? JSON.stringify(result) : null,
-                    page_slug: page_slug,
-                    page_title: page_title
+            var _id = (req.params._id && req.params._id != null && req.params._id != '' && typeof req.params._id !== 'undefined') ? req.params._id : undefined;
+            if (_id) {
+                m_users.findOne({ _id: _id }, (err, result) => {
+                    return res.render('backend/users/update', {
+                        data_user: JSON.stringify(result) ? JSON.stringify(result) : null,
+                        site_info: {
+                            page_title: 'Update user',
+                            page_slug: 'update_user',
+                            me: req.session.me ? req.session.me : null
+                        }
+                    });
                 });
-            });
+            }
         } else if (req.method == 'PUT') {
-            var form = new formidable.IncomingForm(); form.maxFileSize = 200 * 1024 * 1024;
+            var form = new formidable.IncomingForm(); form.maxFileSize = 20 * 1024 * 1024;
             form.parse(req, (err, fields, files) => {
-                var id = fields.id;
-                if (id) {
-                    email = fields.email && valid_email(fields.email) ? fields.email : null;
-                    password = fields.password && valid_password(fields.password) ? md5(fields.password) : null;
+                var _id = (fields._id && fields._id != null && fields._id != '' && typeof fields._id !== 'undefined') ? fields._id : undefined,
+                    email = (fields.email && fields.email != null && fields.email != '' && typeof fields.email !== 'undefined' && valid_email(fields.email)) ? fields.email : null,
+                    password = (fields.password && fields.password != null && fields.password != '' && typeof fields.password !== 'undefined' && valid_password(fields.password)) ? md5(fields.password) : null;
+                if (_id) {
                     var arr_data = new Object();
                     arr_data.email = email;
-                    arr_data.display_name = fields.display_name ? fields.display_name : null;
                     arr_data.password = password;
+                    arr_data.display_name = fields.display_name ? fields.display_name : null;
                     if (files.thumbnail.name) {
                         var name_file = md5(Math.random().toString());
                         var oldpath = files.thumbnail.path;
@@ -391,28 +417,28 @@ var users_controller = {
                         var newpath = path.resolve('assets/backend/uploads/' + name_file + '.' + type_file);
                         fs.rename(oldpath, newpath, (err) => { });
                         arr_data.thumbnail = name_file + '.' + type_file;
-                    }
-
-                    arr_data.role = fields.role ? fields.role : null;
+                    } else {
+                        arr_data.thumbnail = null;
+                    };
+                    arr_data.role = fields.role ? fields.role : '0';
                     arr_data.updated_at = new Date();
-                    m_users.findOneAndUpdate({ _id: id }, { $set: arr_data }, { new: true }, (err, result) => {
+                    m_users.findOneAndUpdate({ _id: _id }, { $set: arr_data }, { new: true }, (err, result) => {
                         if (result) {
-                            res.redirect(get_admin_url + '/users/edit/' + result._id)
+                            res.redirect(get_admin_url + '/users/update/' + result._id)
                         }
                     });
                 }
             });
         }
     },
-    delete: (req, res) => {
-        var page_slug = 'delete';
-        var page_title = 'Delete user';
-        var id = req.body.id;
-        m_users.deleteOne({ _id: id }, (err, result) => {
-            res.redirect(get_admin_url + '/users')
-        });
+    delete: (req, res) => { // done
+        var _id = (req.body._id && req.body._id != null && req.body._id != '' && typeof req.body._id !== 'undefined') ? req.body._id : undefined;
+        if (_id) {
+            m_users.deleteOne({ _id: id }, (err, result) => {
+                res.redirect(get_admin_url + '/users')
+            });
+        }
     }
     // End CURD
-
 }
 module.exports = users_controller;

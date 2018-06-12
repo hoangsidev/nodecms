@@ -7,12 +7,12 @@
 <script src="<%= get_admin_url(); %>/js/socket.io.js"></script>
 <script> var socket = io(); </script>
 
-<% if(typeof page_slug !== 'undefined' && page_slug!='') { %>
-    <% if(page_slug=='create_user') { %>
+<% if(typeof site_info !== 'undefined') { %>
+    <% if(typeof site_info.page_slug !== 'undefined' && site_info.page_slug=='create_user') { %>
         <script src="<%= get_admin_url(); %>/js/users/create.js"></script>
     <% } %>
 
-    <% if(page_slug=='edit_user') { %>
+        <% if(typeof site_info.page_slug !== 'undefined' && site_info.page_slug=='update_user') { %>
         <script src="<%= get_admin_url(); %>/js/users/edit.js"></script>
         <% var user = JSON.parse(data_user); if(user) { %>
             <% if(user.username) { %>
@@ -29,7 +29,8 @@
 
 
 
-    <% if(page_slug=='create' || page_slug=='edit') { %>
+  
+     <% if(typeof site_info.page_slug !== 'undefined' && (site_info.page_slug=='create' || site_info.page_slug=='edit')) { %>
         <script src="https://cdn.ckeditor.com/ckeditor5/10.0.1/decoupled-document/ckeditor.js"></script>
         <script>
             DecoupledEditor
